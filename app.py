@@ -51,9 +51,26 @@ with st.sidebar:
 
 # Home Section
 if options == "Home":
-    st.title("Spotify Recommender 🎵")
-    st.write(
-        "Welcome! Discover new music tailored to your taste with our recommender and chat with our AI-powered assistant for song insights.")
+    st.title("Moodify: Tune into Your Emotions with Spotify 🎶😊")
+    st.write("## Welcome to Moodify!")
+    st.write("Explore music that matches your emotions and discover new tracks based on sentiment. Moodify lets you analyze your Spotify playlists, categorize tracks by mood, and create custom playlists to match your current vibe.")
+    st.write( "Whether you’re looking to lift your spirits, focus, or relax, Moodify helps you find the perfect music for every mood.")
+    st.write("### 1. Connect with Spotify")
+    st.write("- Link your Spotify account to Moodify to analyze your playlists and track data.")
+    st.write("- Get insights on the sentiment of each song in your playlists, including moods like:")
+    st.write("  - **Happy**")
+    st.write("  - **Calm**")
+    st.write("  - **Energetic**")
+    st.write("  - **Melancholic**")
+    st.write("### 2. Discover Mood-Based Playlists")
+    st.write("- Generate custom playlists based on your current mood or explore music that complements specific emotions.")
+    st.write("- Find new tracks similar to your favorites, curated by sentiment analysis.")
+    st.write("### 3. Analyze Your Music Taste")
+    st.write("- Learn more about the emotional themes in your favorite songs.")
+    st.write("- See breakdowns by genre, tempo, and energy levels, and discover how your music matches your mood.")
+    st.write("### 4. Enjoy a Personalized Experience")
+    st.write("With Moodify, music becomes more than just sound. It’s an emotional journey tailored to how you feel.")
+    st.write("Simply click on “Connect Spotify” to start exploring a new way to engage with your playlists.")
 
 # Song Recommendations Section
 elif options == "Song Recommendations":
