@@ -40,7 +40,7 @@ with st.sidebar:
         "Dashboard",
         ["Home", "Song Recommendations", "Top Charts", "Chatbot Assistant"],
         icons=['house', 'music-note', 'chart-bar', 'chat-dots'],
-        menu_icon="music",
+        menu_icon="bar-chart",
         default_index=0,
         styles={
             "icon": {"color": "#f0a500", "font-size": "20px"},
