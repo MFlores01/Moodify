@@ -35,7 +35,7 @@ model = genai.GenerativeModel(
 
 # Sidebar and menu setup
 with st.sidebar:
-    st.image("https://link-to-your-logo.png")
+    st.image("https://raw.githubusercontent.com/MFlores01/Moodify/refs/heads/main/images/White_AI%20Republic.png")
     options = option_menu(
         "Dashboard",
         ["Home", "Song Recommendations", "Top Charts", "Chatbot Assistant"],
