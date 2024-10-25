@@ -1,12 +1,13 @@
 # app.py
-
+from apikey import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, google_gemini_api_key, openai_api_key
+import base64
+import requests
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
 import requests
 import warnings
 import google.generativeai as genai
-from apikey import spotify_api_key, google_gemini_api_key, openai_api_key
 from streamlit_option_menu import option_menu
 import base64
 import urllib.parse
@@ -14,10 +15,28 @@ import urllib.parse
 # Ignore warnings
 warnings.filterwarnings("ignore")
 
-# Spotify OAuth setup
-SPOTIFY_CLIENT_ID = "YOUR_SPOTIFY_CLIENT_ID"
-SPOTIFY_CLIENT_SECRET = "YOUR_SPOTIFY_CLIENT_SECRET"
-SPOTIFY_REDIRECT_URI = "http://localhost:8501"  # Set up your redirect URI
+
+SPOTIFY_REDIRECT_URI = "http://localhost:8502/"  # Make sure this matches your Spotify app settings
+# Generate Spotify access token using client credentials
+def get_spotify_access_token():
+    token_url = "https://accounts.spotify.com/api/token"
+    auth_str = f"{spotify_client_id}:{spotify_client_secret}"
+    headers = {
+        "Authorization": "Basic " + base64.b64encode(auth_str.encode()).decode(),
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    data = {
+        "grant_type": "client_credentials"
+    }
+    response = requests.post(token_url, headers=headers, data=data)
+    return response.json().get("access_token")
+
+def get_spotify_top_tracks():
+    headers = {"Authorization": f"Bearer {st.session_state.spotify_token}"}
+    response = requests.get("https://api.spotify.com/v1/me/top/tracks", headers=headers)
+    return response.json() if response.status_code == 200 else None
+
+
 
 # Streamlit page configuration
 st.set_page_config(page_title="Moodify: Spotify Recommender", page_icon="🎵", layout="wide")
@@ -60,7 +79,7 @@ with st.sidebar:
         }
     )
 
-# Spotify authorization link generation
+# Authorization URL generation (Step 1)
 def get_spotify_auth_link():
     scopes = "user-top-read user-read-private playlist-read-private"
     auth_url = "https://accounts.spotify.com/authorize"
@@ -75,10 +94,12 @@ def get_spotify_auth_link():
     return auth_link
 
 
+# Exchange code for access token (Step 2)
 def get_spotify_token(auth_code):
     token_url = "https://accounts.spotify.com/api/token"
     headers = {
-        "Authorization": "Basic " + base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
+        "Authorization": "Basic " + base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode(),
+        "Content-Type": "application/x-www-form-urlencoded"
     }
     data = {
         "grant_type": "authorization_code",
@@ -89,12 +110,21 @@ def get_spotify_token(auth_code):
     return response.json().get("access_token")
 
 
-# Handle Spotify callback
-query_params = st.query_params
-if "code" in query_params:
-    auth_code = query_params["code"][0]
-    st.session_state.spotify_token = get_spotify_token(auth_code)
-    st.experimental_set_query_params()  # Clear URL parameters for better UX
+
+
+# Spotify logo image
+spotify_logo_url = "https://upload.wikimedia.org/wikipedia/commons/2/26/Spotify_logo_with_text.svg"
+# Handling the redirect and fetching the token (Step 3)
+def handle_redirect():
+    query_params = st.query_params
+    if "code" in query_params and st.session_state.spotify_token is None:
+        auth_code = query_params["code"][0]
+        token = get_spotify_token(auth_code)
+        if token:
+            st.session_state.spotify_token = token
+# Main App Logic
+if 'spotify_token' not in st.session_state:
+    st.session_state.spotify_token = None
 
 # Home Section
 if options == "Home":
@@ -102,12 +132,44 @@ if options == "Home":
     st.write("Welcome to Moodify! Discover music that resonates with your emotions.")
     st.write("Moodify lets you analyze your Spotify playlists, categorize tracks by mood, and create custom playlists.")
 
+    # Styling for center alignment and button appearance
+    st.markdown(f'''
+    <div style="display: flex; justify-content: center; align-items: center; flex-direction: column; margin-top: 20px;">
+        <img src="{spotify_logo_url}" width="200" style="margin-bottom: 20px;" />
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Centered button using inline styles
     if not st.session_state.spotify_token:
         auth_link = get_spotify_auth_link()
-        st.markdown(f"[Connect to Spotify]({auth_link})", unsafe_allow_html=True)
+        button_html = f'''
+        <div style="display:flex; justify-content:center; align-items:center; margin-top:20px;">
+            <a href="{auth_link}" style="
+                background-color:#1DB954; 
+                color:white; 
+                padding: 12px 24px; 
+                text-decoration:none; 
+                border-radius:25px; 
+                font-size:16px;
+                font-weight:bold;
+                display:inline-block;
+                text-align:center;
+                ">
+                Connect to Spotify
+            </a>
+        </div>
+        '''
+        st.markdown(button_html, unsafe_allow_html=True)
     else:
         st.success("Connected to Spotify! You can now get personalized recommendations.")
+        st.write(f"Spotify Token: {st.session_state.spotify_token}")  # Debugging token
 
+    handle_redirect()
+
+st.markdown('<div style="height: 40px;"></div>', unsafe_allow_html=True)
+
+# Check if the app has been redirected with an auth code
+#handle_redirect()
 
 # Spotify API Helper Functions
 def get_spotify_top_tracks():
@@ -128,15 +190,18 @@ def get_mood_based_recommendations(seed_genres, target_energy, target_valence):
     return response.json() if response.status_code == 200 else None
 
 
-# Song Recommendations Section
 if options == "Song Recommendations":
     st.title("Mood-Based Song Recommendations")
 
-    if not st.session_state.spotify_token:
+    # Debug check to display token
+    st.write(f"Spotify Token: {st.session_state.spotify_token}")
+
+    if st.session_state.spotify_token is None:
         st.warning("Please connect to Spotify first.")
     else:
         mood = st.selectbox("Select your mood:", ["Happy", "Energetic", "Calm", "Melancholic"])
 
+        # Mood parameters
         if mood == "Happy":
             target_energy, target_valence = 0.7, 0.8
         elif mood == "Energetic":
@@ -146,13 +211,19 @@ if options == "Song Recommendations":
         else:
             target_energy, target_valence = 0.3, 0.2
 
-        recommendations = get_mood_based_recommendations(seed_genres=[mood.lower()], target_energy=target_energy,
-                                                         target_valence=target_valence)
+        # Get Recommendations
+        recommendations = get_mood_based_recommendations(seed_genres=[mood.lower()], target_energy=target_energy, target_valence=target_valence)
 
         if recommendations:
             for track in recommendations['tracks']:
                 st.write(f"**{track['name']}** by {', '.join(artist['name'] for artist in track['artists'])}")
                 st.write(f"[Listen on Spotify]({track['external_urls']['spotify']})")
+
+                # Embed Spotify player for the track
+                embed_url = track['external_urls']['spotify'].replace("open.spotify.com", "open.spotify.com/embed")
+                st.markdown(f'<iframe src="{embed_url}" width="300" height="80" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>', unsafe_allow_html=True)
+
+
 
 # Weekly Mood Trend Visualization
 if 'mood_data' not in st.session_state:
@@ -188,6 +259,7 @@ if options == "Mood Trend":
 
     plot_mood_trend()
 
+
 # Moodify Assistant Section
 if options == "Moodify Assistant":
     st.title("Chat with Melody, Your Musical Mood Matcher!")
@@ -203,7 +275,6 @@ Instructions:
 3. **Personalization**: Ask users about their favorite genres and how they want to feel. Offer tailored recommendations.
 """
 
-
     def initialize_conversation(prompt):
         if not st.session_state.get("chat_initialized", False):
             if not st.session_state.get("chat_session"):
@@ -212,7 +283,6 @@ Instructions:
             response = st.session_state.chat_session.send_message(prompt)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
             st.session_state.chat_initialized = True
-
 
     initialize_conversation("Hi. I'll explain how you should behave: " + System_Prompt)
 
@@ -232,6 +302,5 @@ Instructions:
             st.markdown(response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-        # Ethical Notice
-        st.write(
-            "**Privacy Notice**: Your mood data is stored locally for this session only and is not shared externally.")
+# Ethical Notice
+st.write("**Privacy Notice**: Your mood data is stored locally for this session only and is not shared externally.")
